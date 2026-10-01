@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Legacy Line Charts v60.10</title>
+    <title>Legacy Line Charts v61.5</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
@@ -32,7 +32,17 @@
         .notes-text-hidden input::placeholder {
             color: transparent !important;
         }
-        
+
+        /* v61.1: Twitter button hint text — hard-switch blink between yellow and white at 1s cycle */
+        @keyframes blinkYellowWhite {
+            0%, 49.99%  { color: #FDE047; }
+            50%, 100%   { color: #FFFFFF; }
+        }
+        .blink-yellow-white {
+            color: #FDE047;
+            animation: blinkYellowWhite 1s step-end infinite;
+        }
+
         /* Critical: Ensure colors print properly */
         @media print {
             /* Force yellow highlights to print */
@@ -58,6 +68,13 @@
             /* v60.8: Hide empty-slot "Click to drop" placeholders on PDF prints (all sites) */
             .pdf-hide-empty-slot {
                 display: none !important;
+            }
+
+            /* v61.4: Hide the Student Manager / Injured-Illness box when its field is empty.
+               visibility (not display) is intentional — the grid cell stays, so the other box
+               keeps its half of the row and page 1 spacing is unchanged. */
+            .print-hide-empty {
+                visibility: hidden !important;
             }
         }
     </style>
@@ -144,7 +161,7 @@
         // Set SUBSCRIBER_MODE = true when building subscriber sites
         // Then populate EMBEDDED_CONFIG with their exported data
         // ============================================================
-        const SUBSCRIBER_MODE = true;  // Master site = false, Subscriber sites = true
+        const SUBSCRIBER_MODE = true;   // Master site = false, Subscriber sites = true
         
         const EMBEDDED_CONFIG = {
           siteId: 'thief-river-falls-prowlers',
@@ -215,7 +232,14 @@
             season3: "Connect to this Site \ndrtigers\n \nMy Sites\n \n 360\nSportsEngine\nRegistration Details\nAssets\nSite Guide\nStyle Guide\nskip navigation\nLegacy Hockey | Minnesota's No. 1 resource for high school hockey's past, present and future.\n\n \nTeam Search\nSearch\nThe TourneyMSHSLNewsTourney TimeSponsorshipsMore\nSubscribe\nThief River Falls\nHistory\nRegular & Postseason\n2023-24\nConference Standings\n Mariucci \n Thief River Falls \nThief River Falls\nHome\nRoster\nGame Schedule\nPlayer Stats\nTeam Stats\nStandings\nPhotos\nVideos\nPosts\nLeague\nDivision\nFilters\nPosition\nAll\nDefenseForwardGoalie\nPlayer Stats\nSkater\n#\tName\tGP\tG\tA\tPTS\tSOG\tSOG %\tPPG\tPPA\tSH\tSHA\tPEN\tPIM\tFOW\tFOL\tTO\tHIT\tBS\t+ / -\tGW\tAVG PTS\n7\tKennett Kezar\t23\t0\t0\t0\t0\t0.0\t0\t0\t0\t0\t1\t2\t0\t0\t0\t0\t0\t0\t0\t0.00\n17\tAlec Dalager\t10\t0\t0\t0\t0\t0.0\t0\t0\t0\t0\t2\t4\t0\t0\t0\t0\t0\t0\t0\t0.00\n17\tTrian Petrescue\t9\t0\t0\t0\t0\t0.0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0.00\n31\tConner Roff\t1\t0\t0\t0\t0\t0.0\t0\t0\t0\t0\t1\t2\t0\t0\t0\t0\t0\t0\t0\t0.00\n2\tOwen Bushy\t15\t1\t1\t2\t1\t100.0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0.13\n21\tParker Lundgren\t22\t0\t2\t2\t0\t0.0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0.09\n10\tJameson Hurst\t27\t0\t3\t3\t0\t0.0\t0\t0\t0\t0\t3\t6\t0\t0\t0\t0\t0\t0\t0\t0.11\n15\tJaxon Hams\t26\t1\t2\t3\t1\t100.0\t0\t0\t0\t0\t9\t18\t0\t0\t0\t0\t0\t0\t0\t0.12\n14\tEvan Paschke\t27\t2\t2\t4\t2\t100.0\t0\t0\t0\t0\t6\t12\t0\t0\t0\t0\t0\t0\t1\t0.15\n16\tAndrew Rogalla\t26\t1\t3\t4\t2\t50.0\t0\t0\t0\t0\t1\t2\t0\t0\t0\t0\t0\t0\t0\t0.15\n7\tJoseph Kelly\t24\t4\t2\t6\t4\t100.0\t0\t0\t0\t0\t2\t4\t0\t0\t0\t0\t0\t0\t0\t0.25\n27\tJackson Boyer\t27\t4\t4\t8\t4\t100.0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t2\t0.30\n29\tGabe Winter\t27\t5\t3\t8\t5\t100.0\t1\t0\t0\t0\t1\t2\t0\t0\t0\t0\t0\t0\t0\t0.30\n4\tTucker Howe\t25\t3\t6\t9\t3\t100.0\t0\t1\t0\t0\t8\t19\t0\t0\t0\t0\t0\t0\t0\t0.36\n26\tBennett Borgen\t25\t2\t9\t11\t2\t100.0\t0\t2\t0\t0\t3\t6\t0\t0\t0\t0\t0\t0\t0\t0.44\n12\tSpencer Hempel\t12\t6\t6\t12\t6\t100.0\t2\t2\t1\t0\t7\t25\t0\t0\t0\t0\t0\t0\t0\t1.00\n9\tRylan Leake\t25\t4\t10\t14\t4\t100.0\t1\t3\t0\t0\t1\t2\t0\t0\t0\t0\t0\t0\t1\t0.56\n66\tBraydin Lund\t13\t5\t9\t14\t5\t100.0\t1\t0\t1\t1\t2\t12\t0\t0\t0\t0\t0\t0\t1\t1.08\n8\tPaul Anderson\t27\t8\t8\t16\t8\t100.0\t2\t0\t0\t0\t2\t4\t0\t0\t0\t0\t0\t0\t2\t0.59\n12\tSpencer Anderson\t18\t11\t7\t18\t11\t100.0\t2\t0\t0\t0\t6\t12\t0\t0\t0\t0\t0\t0\t2\t1.00\n3\tBrayden Spears\t27\t6\t14\t20\t6\t100.0\t0\t1\t0\t0\t19\t38\t0\t0\t0\t0\t0\t0\t0\t0.74\n6\tJace Erickson\t27\t9\t20\t29\t9\t100.0\t3\t6\t1\t0\t7\t14\t0\t0\t0\t0\t0\t0\t0\t1.07\n22\tMax Arlt\t26\t17\t23\t40\t17\t100.0\t2\t9\t0\t1\t7\t17\t0\t0\t0\t0\t0\t0\t0\t1.54\n19\tCooper Anderson\t27\t25\t16\t41\t26\t96.2\t3\t3\t1\t0\t7\t14\t0\t0\t0\t0\t0\t0\t6\t1.52\nGoalie\n#\tName\tGP\tMIN\tW\tL\tT\tSOG\tGA\tSV\tGAA\tSV %\tSO\n35\tNoah Gonzales\t8\t6:00\t0\t0\t0\t5\t2\t3\t17.00\t.600\t0\n31\tConner Roff\t27\t1379:34\t15\t11\t1\t735\t65\t670\t2.40\t.912\t4\n"
           }
         };
-        // ====
+        /* Example for subscriber site:
+        const EMBEDDED_CONFIG = {
+          siteId: 'east-grand-forks',
+          teamSetup: { teamName: '...', logo: '...', colors: {...}, arena: '...', pronunciations: {...} },
+          careerStats: { LASTNAME_FIR: { type: 'skater', data: {...} }, ... },
+          careerSeasonData: { season1: '...', season2: '...', season3: '...' }
+        };
+        */
         // ============================================================
 
         // ============================================================
@@ -295,7 +319,7 @@
           "mankato west scarlets": { name: "Mankato West", nickname: "Scarlets", logo: "https://cdn2.sportngin.com/attachments/team/928a-181704221/MankatoWestLogo-3_large_square.png", primaryColor: "#666666", secondaryColor: "#9C0202" },
           "maple grove crimson": { name: "Maple Grove", nickname: "Crimson", logo: "https://cdn1.sportngin.com/attachments/team/0782-151913572/MG_Crimson-Gold-_2__large_square.png", primaryColor: "#A00008", secondaryColor: "#FFB210" },
           "marshall tigers": { name: "Marshall", nickname: "Tigers", logo: "https://cdn2.sportngin.com/attachments/team/a97c-150039767/MarshallLogo_large_square.png", primaryColor: "#000000", secondaryColor: "#D76106" },
-          "minneapolis millers": { name: "Minneapolis", nickname: "Millers", logo: "https://cdn4.sportngin.com/attachments/team/78e4-151654134/1minneapolis-hockey_large_square.png", primaryColor: "#000000", secondaryColor: "#C0C0C0" },
+          "minneapolis": { name: "Minneapolis", nickname: "", logo: "https://cdn4.sportngin.com/attachments/team/78e4-151654134/1minneapolis-hockey_large_square.png", primaryColor: "#000000", secondaryColor: "#C0C0C0" },
           "minnesota river bulldogs": { name: "Minnesota River", nickname: "Bulldogs", logo: "https://cdn2.sportngin.com/attachments/team/3123-150039289/MinnesotaRiverLogo_large_square.png", primaryColor: "#172EB0", secondaryColor: "#C0C0C0" },
           "minnetonka skippers": { name: "Minnetonka", nickname: "Skippers", logo: "https://cdn3.sportngin.com/attachments/team/17b4-151725018/minnetonka-skippers-hockey-_1__large_square.png", primaryColor: "#666666", secondaryColor: "#063195" },
           "monticello moose": { name: "Monticello", nickname: "Moose", logo: "https://cdn3.sportngin.com/attachments/team/9e6b-151872724/monticello-moose-hockey_large_square.png", primaryColor: "#000000", secondaryColor: "#C30000" },
@@ -668,24 +692,11 @@
                   if (parsed.goalies.third === undefined) parsed.goalies.third = null;
                   if (parsed.goalies.thirdColor === undefined) parsed.goalies.thirdColor = 'WHITE';
                 }
-                // In subscriber mode: normalize any legacy colors (GREEN/RED/BLUE/YELLOW)
-                // to WHITE. Coach-chosen colors (anything else) are preserved.
-                if (SUBSCRIBER_MODE) {
-                  const legacyColors = ['GREEN', 'RED', 'BLUE', 'YELLOW'];
-                  const normalize = (color) => legacyColors.includes(color) ? 'WHITE' : (color || 'WHITE');
-                  if (parsed.line1) parsed.line1.color = normalize(parsed.line1.color);
-                  if (parsed.line2) parsed.line2.color = normalize(parsed.line2.color);
-                  if (parsed.line3) parsed.line3.color = normalize(parsed.line3.color);
-                  if (parsed.line4) parsed.line4.color = normalize(parsed.line4.color);
-                  if (parsed.d1) parsed.d1.color = normalize(parsed.d1.color);
-                  if (parsed.d2) parsed.d2.color = normalize(parsed.d2.color);
-                  if (parsed.d3) parsed.d3.color = normalize(parsed.d3.color);
-                  if (parsed.goalies) {
-                    parsed.goalies.starterColor = normalize(parsed.goalies.starterColor);
-                    parsed.goalies.backupColor  = normalize(parsed.goalies.backupColor);
-                    parsed.goalies.thirdColor   = normalize(parsed.goalies.thirdColor);
-                  }
-                }
+                // v61: legacy-color normalization removed. The old code wiped
+                // GREEN/RED/BLUE/YELLOW on load to clean out pre-color-picker
+                // defaults, but it couldn't distinguish those defaults from
+                // coach-picked colors and silently reset legitimate picks.
+                // Coaches now keep whatever color they choose.
                 return parsed;
               }
             } catch (error) {
@@ -810,6 +821,11 @@
           const [showShareModal, setShowShareModal] = useState(false);
           const [shareImageData, setShareImageData] = useState(null);
           const [shareGenerating, setShareGenerating] = useState(false);
+          // v61: inline Share Social banner — replaces jarring alert() calls that fired after window.open
+          const [shareBanner, setShareBanner] = useState(null); // { kind: 'ok'|'warn', text: string } | null
+          // v61.3: capability flag for the mobile Web Share API path. Only true on devices whose browser
+          // actually supports sharing files (iOS Safari, Android Chrome). Desktop browsers return false.
+          const [canShareFiles, setCanShareFiles] = useState(false);
           const [helpContent, setHelpContent] = useState({ title: '', steps: [] });
           const [importStep, setImportStep] = useState('myTeamHome');
           const [importText, setImportText] = useState('');
@@ -1116,6 +1132,27 @@
           useEffect(() => {
             try { localStorage.setItem('hockey-scout-opponentColors', JSON.stringify(opponentColors)); } catch {}
           }, [opponentColors]);
+
+          // v61.3: detect whether this device supports native file-sharing via the Web Share API.
+          // Runs whenever the share image regenerates. True on mobile iOS Safari and Android Chrome
+          // (where the native share sheet opens with the PNG pre-attached), false on desktop browsers.
+          useEffect(() => {
+            if (!shareImageData) { setCanShareFiles(false); return; }
+            let cancelled = false;
+            (async () => {
+              try {
+                if (!navigator.share || !navigator.canShare) { if (!cancelled) setCanShareFiles(false); return; }
+                const res = await fetch(shareImageData);
+                const blob = await res.blob();
+                const probeFile = new File([blob], 'probe.png', { type: 'image/png' });
+                const ok = navigator.canShare({ files: [probeFile] });
+                if (!cancelled) setCanShareFiles(!!ok);
+              } catch {
+                if (!cancelled) setCanShareFiles(false);
+              }
+            })();
+            return () => { cancelled = true; };
+          }, [shareImageData]);
 
           // Helper Functions
           
@@ -2021,8 +2058,11 @@
                 const line = lines[i];
                 
                 // Try tab-separated first
-                const fields = line.split('\t').map(f => f.trim()).filter(f => f);
-                
+                // v61: preserve empty cells so column positions stay stable (blank Grade in 25-26+ format
+                // was dropping cells and shifting every stat one position left).
+                const fields = line.split('\t').map(f => f.trim());
+                while (fields.length && fields[fields.length - 1] === '') fields.pop();
+
                 if (fields.length >= 4) {
                   // Tab-separated format
                   const number = fields[0];
@@ -2263,7 +2303,10 @@
                 if (!inSkaterSection && !inGoalieSection) continue;
 
                 // Split on tabs - the player stats page always produces tab-separated output
-                const fields = line.split('\t').map(f => f.trim()).filter(f => f);
+                // v61: preserve empty cells so column positions stay stable (blank Grade in 25-26+ format
+                // was dropping cells and shifting every stat one position left — Slapnoicher/Moseley/Swenson bug).
+                const fields = line.split('\t').map(f => f.trim());
+                while (fields.length && fields[fields.length - 1] === '') fields.pop();
                 if (fields.length < 3) continue;
 
                 const number = fields[0];
@@ -2691,7 +2734,13 @@
                 syncLinesWithRoster(updatedRoster);
               } else if (importStep === 'oppHome') {
                 const parsed = parseHomePage(text);
-                setOpponentData(prev => ({ ...prev, ...parsed }));
+                // v61: if the opponent was pre-selected from MSHSL_TEAMS, that entry's
+                // nickname wins over the pasted "Nickname:" line.
+                setOpponentData(prev => {
+                  const next = { ...prev, ...parsed };
+                  if (prev.teamName && lookupTeam(prev.teamName)) next.nickname = prev.nickname;
+                  return next;
+                });
                 
                 // Auto-lookup opponent in MSHSL database (backup if team wasn't pre-selected)
                 if (!opponentLogo) {
@@ -2771,7 +2820,13 @@
                   syncLinesWithRoster(updatedRoster);
                 } else if (importStep === 'oppHome') {
                   const parsed = parseHomePage(importText);
-                  setOpponentData(prev => ({ ...prev, ...parsed }));
+                  // v61: if the opponent was pre-selected from MSHSL_TEAMS, that entry's
+                  // nickname wins over the pasted "Nickname:" line.
+                  setOpponentData(prev => {
+                    const next = { ...prev, ...parsed };
+                    if (prev.teamName && lookupTeam(prev.teamName)) next.nickname = prev.nickname;
+                    return next;
+                  });
                 } else if (importStep === 'oppRoster') {
                   const roster = parseRoster(importText, opponentData.roster);
                   setOpponentData(prev => ({ ...prev, roster }));
@@ -2839,7 +2894,13 @@
                   syncLinesWithRoster(updatedRoster);
                 } else if (importStep === 'oppHome') {
                   const parsed = parseHomePage(importText);
-                  setOpponentData(prev => ({ ...prev, ...parsed }));
+                  // v61: if the opponent was pre-selected from MSHSL_TEAMS, that entry's
+                  // nickname wins over the pasted "Nickname:" line.
+                  setOpponentData(prev => {
+                    const next = { ...prev, ...parsed };
+                    if (prev.teamName && lookupTeam(prev.teamName)) next.nickname = prev.nickname;
+                    return next;
+                  });
                 } else if (importStep === 'oppRoster') {
                   const roster = parseRoster(importText, opponentData.roster);
                   setOpponentData(prev => ({ ...prev, roster }));
@@ -2951,7 +3012,10 @@
                   
                   if (line === '#' || line === 'Name' || line === 'GP' || line.includes('AVG PTS')) continue;
                   
-                  const fields = line.split('\t').filter(f => f.trim());
+                  // v61: preserve empty cells so column positions stay stable (blank Grade in 25-26+ format
+                  // was dropping cells and shifting every stat one position left — Slapnoicher/Moseley/Swenson bug).
+                  const fields = line.split('\t').map(f => f.trim());
+                  while (fields.length && fields[fields.length - 1] === '') fields.pop();
                   
                   if (fields.length < 3) continue;
                   
@@ -3566,14 +3630,14 @@
                         <label className="block text-sm font-semibold mb-2">Select Your Team</label>
                         <select
                           className="w-full border rounded px-3 py-2 text-sm"
-                          value={Object.keys(MSHSL_TEAMS).find(key => MSHSL_TEAMS[key].name === myTeamSetup.teamName?.split(' ').slice(0,-1).join(' ')) || ''}
+                          value={Object.keys(MSHSL_TEAMS).find(key => `${MSHSL_TEAMS[key].name} ${MSHSL_TEAMS[key].nickname}`.trim() === myTeamSetup.teamName?.trim()) || ''}
                           onChange={(e) => {
                             const teamKey = e.target.value;
                             if (teamKey && MSHSL_TEAMS[teamKey]) {
                               const team = MSHSL_TEAMS[teamKey];
                               setMyTeamSetup({
                                 ...myTeamSetup,
-                                teamName: `${team.name} ${team.nickname}`,
+                                teamName: `${team.name} ${team.nickname}`.trim(),
                                 logo: team.logo,
                                 colors: { primary: team.primaryColor, secondary: team.secondaryColor },
                                 arena: ''
@@ -3584,7 +3648,7 @@
                         >
                           <option value="">-- Select Your Team --</option>
                           {Object.entries(MSHSL_TEAMS).sort((a, b) => a[1].name.localeCompare(b[1].name)).map(([key, team]) => (
-                            <option key={key} value={key}>{team.name} {team.nickname}</option>
+                            <option key={key} value={key}>{`${team.name} ${team.nickname}`.trim()}</option>
                           ))}
                         </select>
                       </div>
@@ -4047,7 +4111,7 @@
                             >
                               <option value="">-- Select Team --</option>
                               {Object.entries(MSHSL_TEAMS).sort((a, b) => a[1].name.localeCompare(b[1].name)).map(([key, team]) => (
-                                <option key={key} value={key}>{team.name} {team.nickname}</option>
+                                <option key={key} value={key}>{`${team.name} ${team.nickname}`.trim()}</option>
                               ))}
                             </select>
                           </div>
@@ -4174,7 +4238,7 @@
                   <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
                     <div className="border-b px-6 py-4 flex justify-between items-center">
                       <h2 className="text-xl font-bold">📲 Share Game Sheet</h2>
-                      <button onClick={() => { setShowShareModal(false); setShareImageData(null); }} className="text-gray-500 hover:text-gray-700">
+                      <button onClick={() => { setShowShareModal(false); setShareImageData(null); setShareBanner(null); }} className="text-gray-500 hover:text-gray-700">
                         <X size={24} />
                       </button>
                     </div>
@@ -4322,6 +4386,43 @@
 
                           <p className="text-xs text-gray-500 text-center">✅ Page 1 captured — choose how to share below</p>
 
+                          {/* v61: inline banner replaces alert() for share actions (alert() fires after window.open and gets lost) */}
+                          {shareBanner && (
+                            <div className={`rounded-lg px-3 py-2 text-sm ${shareBanner.kind === 'warn' ? 'bg-amber-50 border border-amber-300 text-amber-900' : 'bg-green-50 border border-green-300 text-green-900'}`}>
+                              {shareBanner.text}
+                            </div>
+                          )}
+
+                          {/* v61.3: Mobile Web Share API — one-tap native share sheet with image pre-attached.
+                              Only renders on devices whose browser supports file-sharing (canShareFiles probed in useEffect).
+                              On a phone this opens iOS/Android's share sheet with Instagram, Messages, Mail, etc. all as targets. */}
+                          {canShareFiles && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const res = await fetch(shareImageData);
+                                  const blob = await res.blob();
+                                  const myTeam = myTeamSetup.teamName || 'My Team';
+                                  const opp = opponentData.teamName ? `${opponentData.teamName} ${opponentData.nickname || ''}`.trim() : 'Opponent';
+                                  const file = new File([blob], `LLC_${myTeam}_vs_${opp}.png`.replace(/\s+/g, '_'), { type: 'image/png' });
+                                  await navigator.share({
+                                    files: [file],
+                                    title: `${myTeam} vs ${opp}`,
+                                    text: `Game prep ready! ${myTeam} vs ${opp} 🏒 #MSHSL #HockeyMN`
+                                  });
+                                  setShareBanner({ kind: 'ok', text: '✅ Share sheet opened — pick where to post.' });
+                                } catch(err) {
+                                  if (err && err.name === 'AbortError') return; // user canceled
+                                  setShareBanner({ kind: 'warn', text: '⚠️ Share failed — use Download or Copy below instead.' });
+                                }
+                              }}
+                              className="w-full text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
+                              style={{ background: 'linear-gradient(90deg, #0ea5e9, #2563eb)' }}
+                            >
+                              📱 Share from phone — Instagram, Messages, Mail…
+                            </button>
+                          )}
+
                           {/* Action buttons */}
                           <div className="grid grid-cols-2 gap-3">
                             {/* Download PNG */}
@@ -4336,9 +4437,9 @@
                                 a.href = shareImageData;
                                 a.click();
                               }}
-                              className="bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-semibold flex items-center justify-center gap-2"
+                              className="bg-green-600 text-white py-3 px-3 rounded-lg hover:bg-green-700 font-semibold flex items-center justify-center gap-2 text-center"
                             >
-                              <Download size={18} /> Download PNG
+                              <Download size={18} /> <span style={{ fontSize: '13px', lineHeight: '1.2' }}>Download — email or desktop IG</span>
                             </button>
 
                             {/* Copy to Clipboard */}
@@ -4348,9 +4449,9 @@
                                   const res = await fetch(shareImageData);
                                   const blob = await res.blob();
                                   await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-                                  alert('✅ Image copied to clipboard! Open any app and paste.');
+                                  setShareBanner({ kind: 'ok', text: '📋 Image copied to clipboard. Open any app and paste (Ctrl+V / ⌘V).' });
                                 } catch(err) {
-                                  alert('Copy failed — use Download PNG instead and post from your files.');
+                                  setShareBanner({ kind: 'warn', text: '⚠️ Copy failed — use Download PNG instead and attach the saved file where you need it.' });
                                 }
                               }}
                               className="bg-gray-700 text-white py-3 rounded-lg hover:bg-gray-800 font-semibold flex items-center justify-center gap-2"
@@ -4361,7 +4462,9 @@
                             {/* Instagram */}
                             <button
                               onClick={async () => {
-                                // Download PNG then open Instagram
+                                // v61: download the PNG AND auto-copy to clipboard (mobile IG paste works), then open Instagram.
+                                // Banner replaces the delayed alert() that was getting lost after window.open.
+                                let downloaded = false;
                                 try {
                                   const a = document.createElement('a');
                                   a.href = shareImageData;
@@ -4369,9 +4472,24 @@
                                   const opp = opponentData.teamName ? `${opponentData.teamName} ${opponentData.nickname || ''}`.trim() : 'Opponent';
                                   a.download = `LLC_${myTeam}_vs_${opp}.png`.replace(/\s+/g, '_');
                                   a.click();
-                                } catch(e) {}
+                                  downloaded = true;
+                                } catch(e) { downloaded = false; }
+                                let copied = false;
+                                try {
+                                  const res = await fetch(shareImageData);
+                                  const blob = await res.blob();
+                                  await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                                  copied = true;
+                                } catch(e) { copied = false; }
+                                const parts = [];
+                                if (downloaded) parts.push('📥 Image downloaded');
+                                if (copied) parts.push('📋 copied to clipboard');
+                                const prefix = parts.length ? parts.join(' and ') + '.' : '⚠️ Could not download or copy automatically.';
+                                setShareBanner({
+                                  kind: parts.length ? 'ok' : 'warn',
+                                  text: `${prefix} Instagram's website doesn't accept paste — click the + in Instagram's left sidebar to create a new post, then upload the downloaded PNG.`
+                                });
                                 window.open('https://www.instagram.com/', '_blank');
-                                setTimeout(() => alert('📥 Game sheet downloaded!\n\nIn Instagram, create a new post and upload the downloaded PNG file.'), 400);
                               }}
                               className="text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
                               style={{ background: 'linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888)' }}
@@ -4382,33 +4500,37 @@
                             {/* Twitter/X compose */}
                             <button
                               onClick={async () => {
-                                // Auto-copy PNG to clipboard before opening Twitter
+                                // v61: copy to clipboard, set the banner, THEN open the tab.
+                                // Also fix handle typo (@LegacyLineCharts → @LegacyLineChart).
+                                let copied = false;
                                 try {
-                                  const dataUrl = shareImageData;
-                                  const res = await fetch(dataUrl);
+                                  const res = await fetch(shareImageData);
                                   const blob = await res.blob();
-                                  await navigator.clipboard.write([
-                                    new ClipboardItem({ 'image/png': blob })
-                                  ]);
+                                  await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                                  copied = true;
                                 } catch(e) {
-                                  // Clipboard write failed silently — user can still paste manually
+                                  copied = false;
                                 }
+                                setShareBanner(copied
+                                  ? { kind: 'ok',   text: '📋 Image copied to your clipboard. In the Twitter composer, click the camera icon or press Ctrl+V (⌘V on Mac) to attach it.' }
+                                  : { kind: 'warn', text: '⚠️ Could not auto-copy the image. Use the Copy to Clipboard button below, then paste in Twitter — or use Download PNG and attach the file.' }
+                                );
                                 const myTeam = myTeamSetup.teamName || 'My Team';
                                 const opp = opponentData.teamName ? `${opponentData.teamName} ${opponentData.nickname || ''}`.trim() : 'Opponent';
-                                const text = encodeURIComponent(`Game prep ready! ${myTeam} vs ${opp} 🏒 #MSHSL #HockeyMN\n\nPowered by @LegacyLineCharts`);
+                                const text = encodeURIComponent(`Game prep ready! ${myTeam} vs ${opp} 🏒 #MSHSL #HockeyMN\n\nPowered by @LegacyLineChart`);
                                 window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank');
-                                setTimeout(() => alert('📋 Game sheet image copied to clipboard!\n\nIn the Twitter composer, click the image icon or paste (Ctrl+V) to attach it to your tweet.'), 400);
                               }}
-                              className="bg-black text-white py-3 rounded-lg hover:bg-gray-900 font-semibold flex items-center justify-center gap-2"
+                              className="bg-black text-white py-3 px-3 rounded-lg hover:bg-gray-900 font-semibold flex flex-col items-center justify-center gap-1 text-center"
                             >
-                              𝕏 Post to Twitter
+                              <span>𝕏 Post to Twitter</span>
+                              <span className="blink-yellow-white" style={{ fontSize: '10px', fontWeight: 'normal', lineHeight: '1.25' }}>Once your post is ready, press Ctrl+V (⌘V on Mac) to add your lines image</span>
                             </button>
                           </div>
 
                           {/* Regenerate */}
                           <div className="text-center">
                             <button
-                              onClick={() => setShareImageData(null)}
+                              onClick={() => { setShareImageData(null); setShareBanner(null); }}
                               className="text-sm text-blue-600 hover:text-blue-800 underline"
                             >
                               ↩ Regenerate image
@@ -4594,7 +4716,7 @@
                         <span>Print</span>
                       </div>
                     </button>
-                    <button onClick={() => { setShareImageData(null); setShowShareModal(true); }} className="bg-sky-500 text-white px-3 py-1 rounded hover:bg-sky-600 flex items-center gap-1 font-semibold" style={{ lineHeight: '1.1' }}>
+                    <button onClick={() => { setShareImageData(null); setShareBanner(null); setShowShareModal(true); }} className="bg-sky-500 text-white px-3 py-1 rounded hover:bg-sky-600 flex items-center gap-1 font-semibold" style={{ lineHeight: '1.1' }}>
                       <Share size={16} />
                       <div className="flex flex-col items-start" style={{ fontSize: '10px' }}>
                         <span>Share</span>
@@ -5206,7 +5328,7 @@
 
                 {/* Manager and Injured Boxes */}
                 <div className="grid grid-cols-2 gap-2 mt-1">
-                  <div className="rounded px-2 py-1 flex items-center" style={{ 
+                  <div className={`rounded px-2 py-1 flex items-center ${!String(myTeamData.studentManager || '').trim() ? 'print-hide-empty' : ''}`} style={{
                     backgroundColor: `${myTeamSetup.colors.primary}15`,
                     border: `2px solid ${myTeamSetup.colors.primary}`
                   }}>
@@ -5220,7 +5342,7 @@
                       style={{ outline: 'none', fontSize: '12px' }}
                     />
                   </div>
-                  <div className="bg-red-50 border-2 border-red-400 rounded px-2 py-1 flex items-center">
+                  <div className={`bg-red-50 border-2 border-red-400 rounded px-2 py-1 flex items-center ${!String(myTeamData.injuries || '').trim() ? 'print-hide-empty' : ''}`}>
                     <span style={{ fontSize: '12px' }} className="font-bold">Injured/Illness:&nbsp;</span>
                     <input
                       type="text"
@@ -5235,7 +5357,7 @@
                 
                 {/* Creator Credit - Page 1 */}
                 <div style={{ textAlign: 'center', fontSize: '10px', color: '#000000', marginTop: '4px', paddingTop: '2px', paddingBottom: '2px' }}>
-                  Created exclusively for the {myTeamData.teamName} {myTeamData.nickname} by Legacy Line Charts - legacylinecharts@gmail.com - © Legacy Line Charts
+                  Created exclusively for the {myTeamSetup.teamName} by Legacy Line Charts - legacylinecharts@gmail.com - © Legacy Line Charts
                 </div>
               </div>
 
@@ -5785,7 +5907,7 @@
                   
                   {/* Creator Credit - Page 2 */}
                   <div style={{ textAlign: 'center', fontSize: '10px', color: '#000000', marginTop: '4px', paddingTop: '2px', paddingBottom: '2px' }}>
-                    Created exclusively for the {myTeamData.teamName} {myTeamData.nickname} by Legacy Line Charts - legacylinecharts@gmail.com - © Legacy Line Charts
+                    Created exclusively for the {myTeamSetup.teamName} by Legacy Line Charts - legacylinecharts@gmail.com - © Legacy Line Charts
                   </div>
                 </div>
               </div>
