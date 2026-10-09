@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Legacy Line Charts v61.5</title>
+    <title>Legacy Line Charts v61.6</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
@@ -2058,10 +2058,13 @@
                 const line = lines[i];
                 
                 // Try tab-separated first
-                // v61: preserve empty cells so column positions stay stable (blank Grade in 25-26+ format
-                // was dropping cells and shifting every stat one position left).
-                const fields = line.split('\t').map(f => f.trim());
-                while (fields.length && fields[fields.length - 1] === '') fields.pop();
+                // v61.6: the Roster page has an empty Photo column, so drop empty cells here (v60.10 behavior).
+                // (The keep-empty-cells fix stays in the STATS readers, where a blank Grade must hold its column.)
+                const fields = line.split('\t').map(f => f.trim()).filter(f => f);
+                // v61.6: player with no Grade listed -> insert a blank grade so the row still imports
+                if (fields.length >= 3 && /^\d+$/.test(fields[0]) && /^(F|D|G|D\|F|F\|D)$/.test(fields[2]) && !/^\d{1,2}$/.test(fields[3] || '')) {
+                  fields.splice(3, 0, '');
+                }
 
                 if (fields.length >= 4) {
                   // Tab-separated format
@@ -2070,7 +2073,7 @@
                   const position = fields[2];
                   const grade = fields[3];
                   
-                  if (/^\d+$/.test(number) && (/^[FDG]$/.test(position) || position === 'D|F' || position === 'F|D') && /^\d{1,2}$/.test(grade)) {
+                  if (/^\d+$/.test(number) && (/^[FDG]$/.test(position) || position === 'D|F' || position === 'F|D') && (/^\d{1,2}$/.test(grade) || grade === '')) {
                     console.log('✓ Found player (tab-separated):', { number, name, position, grade });
                     
                     // Strip (Capt.) or (Capt) or * from names
