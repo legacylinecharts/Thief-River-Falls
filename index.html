@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Legacy Line Charts v62.4</title>
+    <title>Legacy Line Charts v63.2</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
@@ -465,6 +465,19 @@
         // ============================================================
         const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS9f_dnbLuz_ssCdkcf1TX1MccYywmWMbY7xM5rcrpCqOrUMzWmf6b_vLRQvphj4w/pub?output=csv';
 
+        // ============================================================
+        // v63.0: LIVE SUBSCRIBER DATA — Apps Script Web App endpoint
+        // In SUBSCRIBER_MODE, the browser GET-hydrates team state from this
+        // endpoint on page load and POST-syncs changes back as the coach
+        // works. Per-team data lives in its own tab (name = EMBEDDED_CONFIG.siteId)
+        // of the "LLC Live Data" Google Sheet, backing the Apps Script. All sync
+        // is additive — if the fetch fails or the endpoint is unreachable, the
+        // app falls through to localStorage behavior with zero visible disruption.
+        // ============================================================
+        const LIVE_DATA_URL = 'https://script.google.com/macros/s/AKfycbwOdDeGH7rG6sKRiqIxhEVMpNVtQQQpoGu2Szq1lpA1D70k_PyO7xA6sVKUJsBq7G7V/exec';
+        const LIVE_DATA_DEBOUNCE_MS = 1500;
+        const LIVE_DATA_MAX_SECTION_BYTES = 45000;  // leave headroom under the 50K Sheets cell limit
+
         // Minimal CSV parser — handles quoted fields with embedded commas, escaped double-quotes ("")
         // and both \n and \r\n line endings. Strips UTF-8 BOM if present.
         const parseCsv = (text) => {
@@ -598,6 +611,60 @@
           if (!trimmed || trimmed === 'TBD') return raw;
           const found = lookupTeam(trimmed);
           return found && found.name ? found.name : raw;
+        };
+
+        // v62.6 / v63.1: fuzzy player match for parsePlayerStats. Rules (any of these is a match, ranked by priority):
+        //   1. Exact full-name match (case-insensitive) — the common case for Legacy Hockey data
+        //   2. Last name Levenshtein ≤ 2  AND  (first-name Lev ≤ 2  OR  one first name is a prefix of the other
+        //      OR same first 3 chars) — handles typos ("Anderson" ↔ "Andersen"), prefix-style nickname↔formal
+        //      pairs ("Jon" ↔ "Jonathan", "Alex" ↔ "Alexander"), and non-prefix nicknames like Nick ↔ Nicholas
+        //      (both "Nic") without false-matching siblings (Lance ↔ Daniel differ too much on firstName).
+        // Won't catch substitution nicknames (Mike ↔ Michael, Jake ↔ Jacob) — those produce a diagnosable
+        // "0 stats shown" failure that a coach fixes by making names consistent in Legacy Hockey.
+        // When multiple candidates match the fuzzy rule, the one with the lowest total edit distance wins.
+        // NUMBER IS NOT USED — jersey numbers change year-over-year, so matching on number breaks continuity
+        // (Lance Halonen #42 → #12 with brother Daniel having worn #12 before was the original breaking case).
+        const findRosterPlayerFuzzy = (candidates, cleanName, positionFilter) => {
+          if (!cleanName) return null;
+          const parts = cleanName.trim().split(/\s+/);
+          if (parts.length < 1) return null;
+          const inLast  = (parts.pop() || '').toLowerCase();
+          const inFirst = (parts.join(' ') || '').toLowerCase();
+          if (!inLast) return null;
+
+          // Priority 1: exact full-name match (ignore case + Capt./* decoration)
+          for (const p of candidates) {
+            if (positionFilter && !positionFilter(p)) continue;
+            const stored = (p.name || '').trim().toLowerCase();
+            const storedStripped = (p.name || '').replace(/\s*\(Capt\.?\)/i,'').replace(/\*/g,'').trim().toLowerCase();
+            if (stored === cleanName.trim().toLowerCase() || storedStripped === cleanName.trim().toLowerCase()) {
+              return p;
+            }
+          }
+
+          // Priority 2: fuzzy. lastName Lev ≤ 2 AND one of these on firstName:
+          //   • Lev ≤ 2 (small typos)
+          //   • one is a prefix of the other (Jon↔Jonathan, Alex↔Alexander, Will↔William)
+          //   • same first 3 chars (Nick↔Nicholas — not prefix because K vs H)
+          // Pick candidate with lowest total edit distance.
+          let best = null, bestDist = Infinity;
+          for (const p of candidates) {
+            if (positionFilter && !positionFilter(p)) continue;
+            const pLast  = (p.lastName  || '').toLowerCase();
+            const pFirst = (p.firstName || '').toLowerCase();
+            if (!pLast || !pFirst || !inFirst) continue;
+            const lastDist = levenshtein(pLast, inLast);
+            if (lastDist > 2) continue;
+            const firstDist = levenshtein(pFirst, inFirst);
+            const firstPrefix = pFirst.length >= 2 && inFirst.length >= 2 &&
+              (pFirst.startsWith(inFirst) || inFirst.startsWith(pFirst));
+            const first3Same  = pFirst.length >= 3 && inFirst.length >= 3 &&
+              pFirst.substring(0, 3) === inFirst.substring(0, 3);
+            if (firstDist > 2 && !firstPrefix && !first3Same) continue;
+            const total = lastDist + Math.min(firstDist, firstPrefix ? 1 : (first3Same ? 2 : firstDist));
+            if (total < bestDist) { bestDist = total; best = p; }
+          }
+          return best;
         };
 
         // Get sorted list of teams for dropdown
@@ -1294,6 +1361,39 @@
                 MSHSL_TEAMS = parsed;
                 setTeamsDbReady(true);
                 console.log(`✅ Loaded live team DB from Google Sheet (${n} teams).`);
+
+                // v62.5: in SUBSCRIBER_MODE, after the live sheet loads, re-source the subscriber's
+                // OWN team logo + colors from the sheet by looking up their team name. This way a
+                // logo/color change in the Google Sheet shows up on the subscriber's site on the
+                // next page load — no rebuild needed. If the team isn't found in the sheet (or the
+                // fetch earlier failed and we never reached this line), the EMBEDDED_CONFIG baked-in
+                // values stay in place as the fallback. Only logo + colors are overridden — teamName,
+                // arena, careerStats, pronunciations, postHSInfo all remain from EMBEDDED_CONFIG /
+                // localStorage.
+                if (SUBSCRIBER_MODE) {
+                  try {
+                    const myName = myTeamSetup && myTeamSetup.teamName;
+                    if (myName) {
+                      const hit = lookupTeam(myName);
+                      if (hit && (hit.logo || hit.primaryColor || hit.secondaryColor)) {
+                        setMyTeamSetup(prev => ({
+                          ...prev,
+                          logo: hit.logo || prev.logo,
+                          colors: {
+                            ...(prev.colors || {}),
+                            primary: hit.primaryColor || prev.colors?.primary,
+                            secondary: hit.secondaryColor || prev.colors?.secondary
+                          }
+                        }));
+                        console.log(`🎨 Subscriber self-sync: refreshed logo and colors for "${myName}" from live sheet.`);
+                      } else {
+                        console.log(`ℹ️ Subscriber self-sync: no sheet entry matched "${myName}" — keeping embedded logo/colors.`);
+                      }
+                    }
+                  } catch (err) {
+                    console.warn('⚠️ Subscriber self-sync failed — keeping embedded logo/colors:', err && err.message);
+                  }
+                }
               } catch (e) {
                 console.warn('⚠️ Could not fetch live team DB — using baked-in fallback:', e && e.message);
               }
@@ -1302,7 +1402,140 @@
           }, []);
 
           // Helper Functions
-          
+
+          // v63.0: live-data sync infrastructure. Shared state + helper for all 5 sync useEffects.
+          // syncEnabledRef flips true after the hydration useEffect finishes (success or failure),
+          // so initial-render state-change-fires of the sync useEffects don't echo hydrated data
+          // back to the sheet. Each section (page1, lines, pronunciations, coachNotes, postHSInfo)
+          // has its own debounce timer so a flurry of changes in one section coalesces to one POST.
+          const syncEnabledRef = React.useRef(false);
+          const syncTimersRef  = React.useRef({});
+          const liveSlug = SUBSCRIBER_MODE ? (EMBEDDED_CONFIG?.siteId || '').trim().toLowerCase() : '';
+          const scheduleSync = React.useCallback((section, data) => {
+            if (!SUBSCRIBER_MODE || !liveSlug || !syncEnabledRef.current) return;
+            const timers = syncTimersRef.current;
+            if (timers[section]) clearTimeout(timers[section]);
+            timers[section] = setTimeout(async () => {
+              delete timers[section];
+              try {
+                const body = JSON.stringify({ team: liveSlug, patch: { [section]: data } });
+                if (body.length > LIVE_DATA_MAX_SECTION_BYTES && section === 'postHSInfo') {
+                  console.warn(`⚠️ Live sync skipped: ${section} payload is ${body.length} bytes (over ${LIVE_DATA_MAX_SECTION_BYTES} limit). Kept in localStorage only.`);
+                  return;
+                }
+                const res = await fetch(LIVE_DATA_URL, { method: 'POST', body });
+                const json = await res.json().catch(() => null);
+                if (json && json.ok) {
+                  console.log(`🔼 Live sync wrote ${section} (${body.length} bytes).`);
+                } else {
+                  console.warn(`⚠️ Live sync for ${section} returned error:`, json && json.error);
+                }
+              } catch (e) {
+                console.warn(`⚠️ Live sync for ${section} failed:`, e && e.message);
+              }
+            }, LIVE_DATA_DEBOUNCE_MS);
+          }, [liveSlug]);
+
+          // v63.0: hydration — on mount, in SUBSCRIBER_MODE, GET this team's live data from the sheet
+          // and apply each section to state. Only enables the sync useEffects AFTER this finishes
+          // (success OR failure), so sync doesn't echo hydrated data back on first render.
+          useEffect(() => {
+            if (!SUBSCRIBER_MODE || !liveSlug) {
+              syncEnabledRef.current = true;  // master site: no hydration, enable sync (which is a no-op anyway)
+              return;
+            }
+            let cancelled = false;
+            (async () => {
+              try {
+                const res = await fetch(`${LIVE_DATA_URL}?team=${encodeURIComponent(liveSlug)}`);
+                const json = await res.json();
+                if (cancelled) return;
+                if (!json || !json.ok) {
+                  console.warn('⚠️ Live hydration returned non-ok:', json && json.error);
+                  return;
+                }
+                const d = json.data || {};
+                if (d.page1) {
+                  if (d.page1.myTeamData)        setMyTeamData(prev => ({ ...prev, ...d.page1.myTeamData }));
+                  if (d.page1.opponentData)      setOpponentData(prev => ({ ...prev, ...d.page1.opponentData }));
+                  if (d.page1.opponentLogo)      setOpponentLogo(d.page1.opponentLogo);
+                  if (d.page1.opponentColors)    setOpponentColors(d.page1.opponentColors);
+                  if (d.page1.oppSpecialTeamsManual) setOppSpecialTeamsManual(d.page1.oppSpecialTeamsManual);
+                }
+                if (d.lines)                     setLines(prev => ({ ...prev, ...d.lines }));
+                if (d.pronunciations || d.postHSInfo) {
+                  setMyTeamSetup(prev => ({
+                    ...prev,
+                    ...(d.pronunciations ? { pronunciations: d.pronunciations } : {}),
+                    ...(d.postHSInfo ? { postHSInfo: d.postHSInfo } : {})
+                  }));
+                }
+                if (d.coachNotes) {
+                  setCoachNotes(prev => ({
+                    ...prev,
+                    pk:         d.coachNotes.pk         ?? prev.pk,
+                    pp:         d.coachNotes.pp         ?? prev.pp,
+                    pkTitle:    d.coachNotes.pkTitle    ?? prev.pkTitle,
+                    ppTitle:    d.coachNotes.ppTitle    ?? prev.ppTitle,
+                    scoutNotes: d.coachNotes.scoutNotes ?? prev.scoutNotes
+                  }));
+                }
+                console.log(`🔽 Live hydration applied for "${liveSlug}" — sections:`, Object.keys(d).filter(k => !k.startsWith('_')));
+              } catch (e) {
+                console.warn('⚠️ Live hydration failed — using localStorage mirror:', e && e.message);
+              } finally {
+                if (!cancelled) syncEnabledRef.current = true;
+              }
+            })();
+            return () => { cancelled = true; };
+          }, [liveSlug]);
+
+          // v63.0: five sync useEffects — one per data slice. Each fires on its slice's state change,
+          // calls scheduleSync (which no-ops when syncEnabledRef is false, i.e. before hydration done).
+          // Debounced per-section so e.g. rapid line drag-drops coalesce into one POST.
+
+          // (1) page 1 data — my team + opponent headers, logos, colors, manual special teams
+          useEffect(() => {
+            scheduleSync('page1', {
+              myTeamData,
+              opponentData,
+              opponentLogo,
+              opponentColors,
+              oppSpecialTeamsManual
+            });
+          }, [myTeamData, opponentData, opponentLogo, opponentColors, oppSpecialTeamsManual, scheduleSync]);
+
+          // (2) lines — forward lines, D pairs, goalies (my team only; opponent lines stay local per scope)
+          useEffect(() => {
+            scheduleSync('lines', lines);
+          }, [lines, scheduleSync]);
+
+          // (3) pronunciations — key-value map, tiny data
+          useEffect(() => {
+            if (myTeamSetup && myTeamSetup.pronunciations) {
+              scheduleSync('pronunciations', myTeamSetup.pronunciations);
+            }
+          }, [myTeamSetup?.pronunciations, scheduleSync]);
+
+          // (4) coach notes — text content only (pk, pp, titles, scoutNotes). Toggles stay local.
+          useEffect(() => {
+            scheduleSync('coachNotes', {
+              pk:         coachNotes?.pk         || '',
+              pp:         coachNotes?.pp         || '',
+              pkTitle:    coachNotes?.pkTitle    || '',
+              ppTitle:    coachNotes?.ppTitle    || '',
+              scoutNotes: coachNotes?.scoutNotes || { powerPlay: '', penaltyKill: '', keyPlayers: '' }
+            });
+          }, [coachNotes?.pk, coachNotes?.pp, coachNotes?.pkTitle, coachNotes?.ppTitle, coachNotes?.scoutNotes, scheduleSync]);
+
+          // (5) Post-HS logos — base64 image blobs; scheduleSync enforces the per-cell size cap and
+          // falls back to localStorage-only when a team's logos exceed it.
+          useEffect(() => {
+            if (myTeamSetup && myTeamSetup.postHSInfo && Object.keys(myTeamSetup.postHSInfo).length > 0) {
+              scheduleSync('postHSInfo', myTeamSetup.postHSInfo);
+            }
+          }, [myTeamSetup?.postHSInfo, scheduleSync]);
+
           // Compress image before storing in localStorage
           const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.7, fillWhiteBackground = false) => {
             return new Promise((resolve, reject) => {
@@ -2525,13 +2758,10 @@
                 const cleanName = (() => { const p = name.trim().split(/\s+/); const r = []; for (const t of p) { const tc = t.replace(/\*+$/, ''); if (/[a-z]$/.test(tc)) r.push(tc); else break; } return r.length > 0 ? r.join(' ') : p[0]; })();
 
                 if (inSkaterSection) {
-                  const player = updatedRoster.find(p =>
-                    p.number === number &&
-                    p.position !== 'G' &&
-                    (p.name === cleanName ||
-                     p.name.replace(/\s*\(Capt\.?\)/i,'').replace(/\*/g,'').trim() === cleanName ||
-                     p.lastName === cleanName.split(' ').pop())
-                  );
+                  // v63.1 (ported from v62.6): fuzzy match on name (no number). Handles jersey
+                  // number changes year-over-year and tolerates typos/prefix-nicknames. See
+                  // findRosterPlayerFuzzy for the full rules.
+                  const player = findRosterPlayerFuzzy(updatedRoster, cleanName, (p) => p.position !== 'G');
 
                   if (player && fields.length >= (6 + fieldOffset)) {
                     const currentStats = {
@@ -2584,13 +2814,9 @@
                   }
 
                 } else if (inGoalieSection) {
-                  const player = updatedRoster.find(p =>
-                    p.number === number &&
-                    p.position === 'G' &&
-                    (p.name === cleanName ||
-                     p.name.replace(/\s*\(Capt\.?\)/i,'').replace(/\*/g,'').trim() === cleanName ||
-                     p.lastName === cleanName.split(' ').pop())
-                  );
+                  // v63.1 (ported from v62.6): fuzzy match on name (no number). Same rules as the
+                  // skater branch, position filter switched to G.
+                  const player = findRosterPlayerFuzzy(updatedRoster, cleanName, (p) => p.position === 'G');
 
                   if (player && player.goalieStats && fields.length >= (10 + fieldOffset)) {
                     const currentGoalieStats = {
